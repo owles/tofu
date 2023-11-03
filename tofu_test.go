@@ -1,6 +1,9 @@
 package tofu
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 type Foo struct {
 	Name string
@@ -25,6 +28,8 @@ var mapInterface = map[string]interface{}{
 		},
 	},
 }
+
+var jsonObject = "{ \"a\": 1, \"b\": \"2\", \"c\": { \"b\": 1.2 } }"
 
 func TestGetValue(t *testing.T) {
 	path := "foo.bar"
@@ -58,5 +63,18 @@ func TestGetValueStruct(t *testing.T) {
 	path := "baz.foo.Name"
 	if Get(mapInterface, path) != "name" {
 		t.Error("Get failed:", path)
+	}
+}
+
+func TestGetJson(t *testing.T) {
+	var data map[string]interface{}
+	if json.Unmarshal([]byte(jsonObject), &data) != nil {
+		t.Error("Invalid JSON")
+	} else {
+		path := "a"
+		val := GetN(data, path).Int()
+		if val != 1 {
+			t.Error("Get failed:", path)
+		}
 	}
 }

@@ -22,20 +22,32 @@ func (v Result) String() string {
 		return v.raw.String()
 	}
 
+	if v.raw.IsValid() && (v.raw.Kind() == reflect.Interface) {
+		return CastToString(v.raw.Interface())
+	}
+
 	return ""
 }
 
-func (v Result) Int() int64 {
-	if v.raw.IsValid() && v.raw.Kind() == reflect.Int {
-		return v.raw.Int()
+func (v Result) Int() int {
+	if v.raw.IsValid() && (v.raw.Kind() == reflect.Int || v.raw.Kind() == reflect.Float64 || v.raw.Kind() == reflect.Float32) {
+		return int(v.raw.Int())
+	}
+
+	if v.raw.IsValid() && (v.raw.Kind() == reflect.Interface) {
+		return CastToInt(v.raw.Interface())
 	}
 
 	return -1
 }
 
 func (v Result) Float() float64 {
-	if v.raw.IsValid() && (v.raw.Kind() == reflect.Float64 || v.raw.Kind() == reflect.Float32) {
-		return v.raw.Float()
+	if v.raw.IsValid() && (v.raw.Kind() == reflect.Float64 || v.raw.Kind() == reflect.Float32 || v.raw.Kind() == reflect.Int) {
+		return float64(v.raw.Float())
+	}
+
+	if v.raw.IsValid() && (v.raw.Kind() == reflect.Interface) {
+		return CastToFloat(v.raw.Interface())
 	}
 
 	return -1
@@ -46,16 +58,11 @@ func (v Result) Bool() bool {
 		return v.raw.Bool()
 	}
 
-	return false
-}
-
-func Get(src interface{}, path string, def ...any) interface{} {
-	val := get(reflect.ValueOf(src), strings.Split(path, "."), def...)
-	if val.IsValid() && val.CanInterface() {
-		return val.Interface()
+	if v.raw.IsValid() && (v.raw.Kind() == reflect.Interface) {
+		return CastToBool(v.raw.Interface())
 	}
 
-	return nil
+	return false
 }
 
 func GetN(src interface{}, path string, def ...any) Result {
@@ -69,6 +76,143 @@ func GetN(src interface{}, path string, def ...any) Result {
 	return Result{
 		raw: reflect.ValueOf(nil),
 	}
+}
+
+func Get(src interface{}, path string, def ...any) interface{} {
+	val := get(reflect.ValueOf(src), strings.Split(path, "."), def...)
+	if val.IsValid() && val.CanInterface() {
+		return val.Interface()
+	}
+
+	return nil
+}
+
+func CastToInt(i any, def ...int) int {
+	if v, ok := i.(int); ok {
+		return v
+	}
+	if v, ok := i.(float32); ok {
+		return int(v)
+	}
+	if v, ok := i.(float64); ok {
+		return int(v)
+	}
+	if v, ok := i.(string); ok {
+		res, err := strconv.Atoi(v)
+		if err == nil {
+			return res
+		}
+	}
+	if v, ok := i.(bool); ok {
+		if v {
+			return 1
+		} else {
+			return 0
+		}
+	}
+
+	if len(def) > 0 {
+		return def[0]
+	}
+
+	return 0
+}
+
+func CastToFloat(i any, def ...float64) float64 {
+	if v, ok := i.(float64); ok {
+		return v
+	}
+	if v, ok := i.(int); ok {
+		return float64(v)
+	}
+	if v, ok := i.(float32); ok {
+		return float64(v)
+	}
+	if v, ok := i.(string); ok {
+		res, err := strconv.ParseFloat(v, 64)
+		if err == nil {
+			return res
+		}
+	}
+	if v, ok := i.(bool); ok {
+		if v {
+			return 1
+		} else {
+			return 0
+		}
+	}
+
+	if len(def) > 0 {
+		return def[0]
+	}
+
+	return 0
+}
+
+func intToBool[T int | float64 | float32](v T) bool {
+	if v <= 0 {
+		return false
+	}
+	if v >= 1 {
+		return true
+	}
+
+	return false
+}
+
+func CastToBool(i any, def ...bool) bool {
+	if v, ok := i.(bool); ok {
+		return v
+	}
+	if v, ok := i.(float64); ok {
+		return intToBool(v)
+	}
+	if v, ok := i.(int); ok {
+		return intToBool(v)
+	}
+	if v, ok := i.(float32); ok {
+		return intToBool(v)
+	}
+	if v, ok := i.(string); ok {
+		res, err := strconv.ParseBool(v)
+		if err == nil {
+			return res
+		}
+	}
+
+	if len(def) > 0 {
+		return def[0]
+	}
+
+	return false
+}
+
+func CastToString(i any, def ...string) string {
+	if v, ok := i.(bool); ok {
+		if v {
+			return "true"
+		} else {
+			return "false"
+		}
+	}
+	if v, ok := i.(int); ok {
+		return strconv.Itoa(v)
+	}
+	if v, ok := i.(float64); ok {
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	}
+	if v, ok := i.(float32); ok {
+		return strconv.FormatFloat(float64(v), 'f', -1, 64)
+	}
+	if v, ok := i.(string); ok {
+		return v
+	}
+
+	if len(def) > 0 {
+		return def[0]
+	}
+
+	return ""
 }
 
 func get(src reflect.Value, path []string, def ...any) reflect.Value {
